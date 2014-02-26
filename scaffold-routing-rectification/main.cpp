@@ -49,7 +49,7 @@ PxRigidDynamic* createDynamic(const PxTransform& t, const PxGeometry& geometry, 
 
 PxRigidDynamic *createHelix(const PxTransform & t, PxReal length) {
 	PxRigidDynamic* dynamic = PxCreateDynamic(*gPhysics, t, PxCapsuleGeometry(), *gMaterial, 10.0f);
-	return dynamic; // TODO
+	return dynamic; // TODO add shapes.
 }
 
 #ifdef _WINDOWS
