@@ -1,3 +1,7 @@
+#include <DNA.h>
+#include <Utility.h>
+
+#include <cassert>
 #include <csignal>
 #include <cstdio>
 #include <cstdlib>
@@ -47,8 +51,23 @@ PxRigidDynamic* createDynamic(const PxTransform& t, const PxGeometry& geometry, 
 	return dynamic;
 }
 
-PxRigidDynamic *createHelix(const PxTransform & t, PxReal length) {
-	PxRigidDynamic* dynamic = PxCreateDynamic(*gPhysics, t, PxCapsuleGeometry(), *gMaterial, 10.0f);
+PxRigidDynamic *createHelix(const PxTransform & t, int bases) {
+	PxReal length(bases * DNA::STEP);
+	assert(length > DNA::RADIUS * 2);
+	PxRigidDynamic *dynamic = PxCreateDynamic(*gPhysics, t, PxCapsuleGeometry(PxReal(DNA::RADIUS + DNA::SPHERE_RADIUS), length / 2 - PxReal(DNA::RADIUS + DNA::SPHERE_RADIUS)), *gMaterial, 10.0f);
+	/*for (int i = 0; i < bases; ++i) {
+		dynamic->createShape(PxSphereGeometry(DNA::SPHERE_RADIUS), *gMaterial)->setLocalPose(PxTransform(PxQuat(toRadians(DNA::PITCH * i), PxVec3(1, 0, 0)).rotate(PxVec3(PxReal(i * DNA::STEP) - length / 2, 0, DNA::RADIUS))));
+	}*/
+
+	const PxReal radius(DNA::SPHERE_RADIUS * 4);
+	const PxReal offset(DNA::RADIUS - radius + DNA::SPHERE_RADIUS);
+	dynamic->createShape(PxSphereGeometry(radius), *gMaterial)->setLocalPose(PxTransform(PxVec3(-length / 2 + radius, 0, offset)));
+	dynamic->createShape(PxSphereGeometry(radius), *gMaterial)->setLocalPose(PxTransform(PxQuat(toRadians(DNA::OPPOSITE_ROTATION), PxVec3(1, 0, 0)).rotate(PxVec3(-length / 2 + radius, 0, offset))));
+
+	dynamic->createShape(PxSphereGeometry(radius), *gMaterial)->setLocalPose(PxTransform(PxQuat(toRadians(DNA::PITCH * bases), PxVec3(1, 0, 0)).rotate(PxVec3(PxReal(bases * DNA::STEP) - length / 2 - radius, 0, offset))));
+	dynamic->createShape(PxSphereGeometry(radius), *gMaterial)->setLocalPose(PxTransform(PxQuat(toRadians(DNA::PITCH * bases + DNA::OPPOSITE_ROTATION), PxVec3(1, 0, 0)).rotate(PxVec3(PxReal(bases * DNA::STEP) - length / 2 - radius, 0, offset))));
+
+	gScene->addActor(*dynamic);
 	return dynamic; // TODO add shapes.
 }
 
@@ -95,15 +114,16 @@ int main(int argc, const char **argv) {
 	std::vector<PxRigidDynamic *> balls;
 	for (int i = 0; i < 10; ++i) {
 		//PxRigidDynamic *ball(createDynamic(PxTransform(PxVec3(0, PxReal(2 * i + 1), 0)), PxSphereGeometry(1)));
-		PxRigidDynamic *ball(createDynamic(PxTransform(PxVec3(0, PxReal(2 * i + 1), PxReal(i) * PxReal(0.2))), PxCapsuleGeometry(1, 2)));
+		//PxRigidDynamic *ball(createDynamic(PxTransform(PxVec3(0, PxReal(2 * i + 1), PxReal(i) * PxReal(0.2))), PxCapsuleGeometry(1, 2)));
+		PxRigidDynamic *ball(createHelix(PxTransform(PxVec3(0, PxReal((DNA::RADIUS + DNA::SPHERE_RADIUS) * 2 * i + 1), PxReal(i) * PxReal(0.2))), 21));
 		balls.push_back(ball);
 	}
 
 	std::vector<PxRigidDynamic *>::iterator it(balls.begin());
 	std::vector<PxRigidDynamic *>::iterator prev_it(it++);
 	for (; it != balls.end(); ++it, ++prev_it) {
-		PxSphericalJointCreate(*gPhysics, *prev_it, PxTransform(1, 1, 0), *it, PxTransform(1, -1, 0));
-		PxSphericalJointCreate(*gPhysics, *prev_it, PxTransform(-1, 1, 0), *it, PxTransform(-1, -1, 0));
+		//PxSphericalJointCreate(*gPhysics, *prev_it, PxTransform(1, DNA::RADIUS, 0), *it, PxTransform(1, -DNA::RADIUS, 0));
+		//PxSphericalJointCreate(*gPhysics, *prev_it, PxTransform(-1, DNA::RADIUS, 0), *it, PxTransform(-1, -DNA::RADIUS, 0));
 	}
 
 	{

@@ -19,7 +19,17 @@
     </ProjectConfiguration>
   </ItemGroup>
   <ItemGroup>
+    <ClCompile Include="..\src\Definition.cpp" />
+    <ClCompile Include="..\src\Helix.cpp" />
+    <ClCompile Include="..\src\Scene.cpp" />
     <ClCompile Include="main.cpp" />
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="..\include\Definition.h" />
+    <ClInclude Include="..\include\DNA.h" />
+    <ClInclude Include="..\include\Helix.h" />
+    <ClInclude Include="..\include\Scene.h" />
+    <ClInclude Include="..\include\Utility.h" />
   </ItemGroup>
   <PropertyGroup Label="Globals">
     <ProjectGuid>{DBDDFBE1-1FDC-4CFA-A151-64E91A90FCE1}</ProjectGuid>
