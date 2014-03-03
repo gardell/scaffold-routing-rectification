@@ -18,7 +18,14 @@ public:
 private:
 	bool setupHelices(physx::PxPhysics & physics, physx::PxScene & scene);
 
-	std::vector<physx::PxVec3> vertices;
+	struct Vertex {
+		physx::PxVec3 position;
+		std::vector<unsigned int> neighbors; // Vertex indices.
+
+		// TODO: Return the closest edge relative to the given edges.
+		unsigned int findOppositeNeighbor(unsigned int previousVertex, unsigned int nextVertex);
+	};
+	std::vector<Vertex> vertices;
 	std::vector<unsigned int> path;
 	std::vector<Helix> helices;
 };

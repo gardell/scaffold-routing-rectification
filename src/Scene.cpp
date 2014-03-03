@@ -8,6 +8,7 @@
 bool Scene::read(physx::PxPhysics & physics, physx::PxScene & scene, std::ifstream & ifile) {
 	physx::PxVec3 vertex, zDirection;
 	unsigned int edge, numBases;
+	unsigned int gcount(0);
 	std::string line;
 
 	while (ifile.good()) {
@@ -20,7 +21,13 @@ bool Scene::read(physx::PxPhysics & physics, physx::PxScene & scene, std::ifstre
 		} else if (sscanf(line.c_str(), "h %u %f %f %f %f %f %f", &numBases, &vertex.x, &vertex.y, &vertex.z, &zDirection.x, &zDirection.y, &zDirection.z) == 7) {
 			const physx::PxVec3 cross(kPosZAxis.cross(zDirection));
 			helices.push_back(Helix(physics, scene, numBases, physx::PxTransform(vertex, physx::PxQuat(signedAngle(kPosZAxis, zDirection, cross), cross.getNormalized()))));
-		}
+		} else if (line[0] == 'g')
+			++gcount;
+	}
+
+	if (gcount > 1) {
+		PRINT("CRITICAL: The importer does not support multiple meshes stored in one file. Aborting.");
+		return false;
 	}
 
 	assert(helices.empty() || helices.size() == path.size() - 1);
