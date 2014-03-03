@@ -12,8 +12,6 @@
 #include <cmath>
 #include <vector>
 
-#include <PxPhysicsAPI.h>
-
 #ifdef __GNUC__
 
 #ifndef likely

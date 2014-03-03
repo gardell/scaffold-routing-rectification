@@ -25,6 +25,11 @@
 								<option id="gnu.cpp.compiler.exe.debug.option.debugging.level.1637096693" name="Debug Level" superClass="gnu.cpp.compiler.exe.debug.option.debugging.level" value="gnu.cpp.compiler.debugging.level.max" valueType="enumerated"/>
 								<option id="gnu.cpp.compiler.option.include.paths.1389715928" name="Include paths (-I)" superClass="gnu.cpp.compiler.option.include.paths" valueType="includePath">
 									<listOptionValue builtIn="false" value="&quot;${workspace_loc:/${ProjName}/include}&quot;"/>
+									<listOptionValue builtIn="false" value="&quot;/home/johan/Programming/NVIDIA PhysX-3.3.0_LINUX_SDK_Core/Include&quot;"/>
+								</option>
+								<option id="gnu.cpp.compiler.option.other.other.1711716787" name="Other flags" superClass="gnu.cpp.compiler.option.other.other" value="-c -fmessage-length=0 -std=c++11" valueType="string"/>
+								<option id="gnu.cpp.compiler.option.preprocessor.def.1709014218" name="Defined symbols (-D)" superClass="gnu.cpp.compiler.option.preprocessor.def" valueType="definedSymbols">
+									<listOptionValue builtIn="false" value="_DEBUG"/>
 								</option>
 								<inputType id="cdt.managedbuild.tool.gnu.cpp.compiler.input.1823639121" superClass="cdt.managedbuild.tool.gnu.cpp.compiler.input"/>
 							</tool>
@@ -35,11 +40,25 @@
 							</tool>
 							<tool id="cdt.managedbuild.tool.gnu.c.linker.exe.debug.1278631689" name="GCC C Linker" superClass="cdt.managedbuild.tool.gnu.c.linker.exe.debug"/>
 							<tool id="cdt.managedbuild.tool.gnu.cpp.linker.exe.debug.486563997" name="GCC C++ Linker" superClass="cdt.managedbuild.tool.gnu.cpp.linker.exe.debug">
-								<option id="gnu.cpp.link.option.paths.1847238619" superClass="gnu.cpp.link.option.paths" valueType="libPaths">
+								<option id="gnu.cpp.link.option.paths.1847238619" name="Library search path (-L)" superClass="gnu.cpp.link.option.paths" valueType="libPaths">
 									<listOptionValue builtIn="false" value="&quot;/home/johan/Programming/NVIDIA PhysX-3.3.0_LINUX_SDK_Core/Lib/linux64&quot;"/>
+									<listOptionValue builtIn="false" value="SimulationControllerCHECKED"/>
 								</option>
-								<option id="gnu.cpp.link.option.libs.1809780360" superClass="gnu.cpp.link.option.libs" valueType="libs">
+								<option id="gnu.cpp.link.option.libs.1809780360" name="Libraries (-l)" superClass="gnu.cpp.link.option.libs" valueType="libs">
 									<listOptionValue builtIn="false" value="PhysXVisualDebuggerSDKCHECKED"/>
+									<listOptionValue builtIn="false" value="LowLevelClothCHECKED"/>
+									<listOptionValue builtIn="false" value="PhysX3VehicleCHECKED"/>
+									<listOptionValue builtIn="false" value="pthread"/>
+									<listOptionValue builtIn="false" value="rt"/>
+									<listOptionValue builtIn="false" value="SimulationControllerCHECKED"/>
+									<listOptionValue builtIn="false" value="PhysX3CookingCHECKED"/>
+									<listOptionValue builtIn="false" value="PhysX3ExtensionsCHECKED"/>
+									<listOptionValue builtIn="false" value="PhysX3CharacterKinematicCHECKED"/>
+									<listOptionValue builtIn="false" value="SceneQueryCHECKED"/>
+									<listOptionValue builtIn="false" value="LowLevelCHECKED"/>
+									<listOptionValue builtIn="false" value="PxTaskCHECKED"/>
+									<listOptionValue builtIn="false" value="PvdRuntimeCHECKED"/>
+									<listOptionValue builtIn="false" value="PhysXProfileSDKCHECKED"/>
 									<listOptionValue builtIn="false" value="PhysX3CHECKED"/>
 									<listOptionValue builtIn="false" value="PhysX3CommonCHECKED"/>
 								</option>
@@ -130,4 +149,12 @@
 		</scannerConfigBuildInfo>
 	</storageModule>
 	<storageModule moduleId="org.eclipse.cdt.core.LanguageSettingsProviders"/>
+	<storageModule moduleId="refreshScope" versionNumber="2">
+		<configuration configurationName="Release">
+			<resource resourceType="PROJECT" workspacePath="/scaffold-routing-rectification"/>
+		</configuration>
+		<configuration configurationName="Debug">
+			<resource resourceType="PROJECT" workspacePath="/scaffold-routing-rectification"/>
+		</configuration>
+	</storageModule>
 </cproject>

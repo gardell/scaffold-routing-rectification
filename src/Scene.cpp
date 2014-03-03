@@ -40,7 +40,7 @@ bool Scene::setupHelices(physx::PxPhysics & physics, physx::PxScene & scene) {
 		std::vector<unsigned int>::const_iterator prev_it(it++);
 
 		for (; it != path.end(); ++it, ++prev_it) {
-			const physx::PxVec3 & vertex1(vertices[*prev_it]), &vertex2(vertices[*it]);
+			const physx::PxVec3 & vertex1(vertices[*prev_it].position), &vertex2(vertices[*it].position);
 			physx::PxVec3 origo((vertex1 + vertex2) / 2), direction(vertex2 - vertex1);
 			const physx::PxReal length(direction.normalize());
 			const physx::PxVec3 cross(kPosZAxis.cross(direction));
@@ -67,8 +67,8 @@ bool Scene::setupHelices(physx::PxPhysics & physics, physx::PxScene & scene) {
 }
 
 bool Scene::write(std::ofstream & ofile) const {
-	for (const physx::PxVec3 & vertex : vertices)
-		ofile << "v " << vertex.x << ' ' << vertex.y << ' ' << vertex.z << std::endl;
+	for (const Vertex & vertex : vertices)
+		ofile << "v " << vertex.position.x << ' ' << vertex.position.y << ' ' << vertex.position.z << std::endl;
 
 	for (unsigned int edge : path)
 		ofile << "e " << edge << std::endl;

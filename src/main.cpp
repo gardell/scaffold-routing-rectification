@@ -10,7 +10,7 @@
 #ifdef _WINDOWS
 #include <windows.h>
 #else
-#include <sys/utime.h>
+#include <unistd.h>
 #endif /* N _WINDOWS */
 
 #include <PxPhysicsAPI.h>

@@ -9,7 +9,6 @@ RM := rm -rf
 # All of the sources participating in the build are defined here
 -include sources.mk
 -include src/subdir.mk
--include scaffold-routing-rectification/subdir.mk
 -include subdir.mk
 -include objects.mk
 
@@ -45,7 +44,7 @@ all: scaffold-routing-rectification
 scaffold-routing-rectification: $(OBJS) $(USER_OBJS)
 	@echo 'Building target: $@'
 	@echo 'Invoking: GCC C++ Linker'
-	g++ -L"/home/johan/Programming/NVIDIA PhysX-3.3.0_LINUX_SDK_Core/Lib/linux64" -o "scaffold-routing-rectification" $(OBJS) $(USER_OBJS) $(LIBS)
+	g++ -L"/home/johan/Programming/NVIDIA PhysX-3.3.0_LINUX_SDK_Core/Lib/linux64" -LSimulationControllerCHECKED -o "scaffold-routing-rectification" $(OBJS) $(USER_OBJS) $(LIBS)
 	@echo 'Finished building target: $@'
 	@echo ' '
 

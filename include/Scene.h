@@ -24,6 +24,8 @@ private:
 
 		// TODO: Return the closest edge relative to the given edges.
 		unsigned int findOppositeNeighbor(unsigned int previousVertex, unsigned int nextVertex);
+
+		inline Vertex(const physx::PxVec3 & position) : position(position) {}
 	};
 	std::vector<Vertex> vertices;
 	std::vector<unsigned int> path;

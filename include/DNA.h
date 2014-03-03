@@ -8,6 +8,8 @@
 #ifndef DNA_H_
 #define DNA_H_
 
+#include <cmath>
+
 namespace DNA {
 	const double PITCH = 720.0 / 21.0,														// degrees
 		STEP = 0.334,
@@ -24,7 +26,7 @@ namespace DNA {
 	*/
 	template<typename T>
 	int DistanceToBaseCount(T distance) {
-		return int(floor(distance / T(STEP) + T(0.5)));
+		return int(std::floor(distance / T(STEP) + T(0.5)));
 	}
 	/*
 	* Returns the actual length a helix created to match the distance will actually have.

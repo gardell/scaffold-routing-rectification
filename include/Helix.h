@@ -2,7 +2,6 @@
 #define _HELIX_H_
 
 #include <Utility.h>
-#include <PxPhysicsAPI.h>
 
 #include <array>
 #include <utility>
@@ -42,8 +41,8 @@ private:
 	physx::PxRigidDynamic *rigidBody = NULL;
 
 	struct Connection {
-		physx::PxJoint *joint;
 		Helix *helix;
+		physx::PxJoint *joint;
 
 		inline Connection(Helix & helix, physx::PxJoint & joint) : helix(&helix), joint(&joint) {}
 		inline Connection() : helix(NULL), joint(NULL) {}
