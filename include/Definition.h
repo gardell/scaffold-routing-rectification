@@ -15,10 +15,12 @@
 #define _USE_MATH_DEFINES
 #define NOMINMAX /* Windows defines min, max that messes up std::min, std::max */
 
+#define ANGLE_EPSILON (10e-05)
+
 #include <cstdlib>
 #include <cmath> // Needed by PxPhysicsAPI.h under Linux.
 
-#include <PxPhysicsAPI.h>
+#include <Physics.h>
 
 namespace Debug {
 	void printf(const char *file, const char *function, size_t line, const char *expr, ...);

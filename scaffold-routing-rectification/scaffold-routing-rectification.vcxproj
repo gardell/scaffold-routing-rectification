@@ -21,14 +21,18 @@
   <ItemGroup>
     <ClCompile Include="..\src\Definition.cpp" />
     <ClCompile Include="..\src\Helix.cpp" />
+    <ClCompile Include="..\src\main.cpp" />
+    <ClCompile Include="..\src\Physics.cpp" />
     <ClCompile Include="..\src\Scene.cpp" />
-    <ClCompile Include="main.cpp" />
+    <ClCompile Include="..\src\Utility.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\include\Definition.h" />
     <ClInclude Include="..\include\DNA.h" />
     <ClInclude Include="..\include\Helix.h" />
+    <ClInclude Include="..\include\Physics.h" />
     <ClInclude Include="..\include\Scene.h" />
+    <ClInclude Include="..\include\SimulatedAnnealing.h" />
     <ClInclude Include="..\include\Utility.h" />
   </ItemGroup>
   <PropertyGroup Label="Globals">

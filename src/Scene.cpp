@@ -1,12 +1,21 @@
+#include <Definition.h>
 #include <DNA.h>
 #include <Scene.h>
+#include <SimulatedAnnealing.h>
 
-#include <cstdio>
+#include <array>
 #include <cassert>
+#include <functional>
 #include <string>
+#include <cstdio>
+#include <iostream>
+#include <set>
+#include <sstream>
+#include <string>
+#include <unordered_map>
 
-bool Scene::read(physx::PxPhysics & physics, physx::PxScene & scene, std::ifstream & ifile) {
-	physx::PxVec3 vertex, zDirection;
+bool scene::read(physics & phys, std::ifstream & ifile) {
+	physics::vec3_type vertex, zDirection;
 	unsigned int edge, numBases;
 	unsigned int gcount(0);
 	std::string line;
@@ -15,12 +24,13 @@ bool Scene::read(physx::PxPhysics & physics, physx::PxScene & scene, std::ifstre
 		std::getline(ifile, line);
 
 		if (sscanf(line.c_str(), "e %u", &edge) == 1) {
+			assert(edge >= 1);
 			path.push_back(edge - 1);
 		} else if (sscanf(line.c_str(), "v %f %f %f", &vertex.x, &vertex.y, &vertex.z) == 3) {
 			vertices.push_back(vertex);
 		} else if (sscanf(line.c_str(), "h %u %f %f %f %f %f %f", &numBases, &vertex.x, &vertex.y, &vertex.z, &zDirection.x, &zDirection.y, &zDirection.z) == 7) {
-			const physx::PxVec3 cross(kPosZAxis.cross(zDirection));
-			helices.push_back(Helix(physics, scene, numBases, physx::PxTransform(vertex, physx::PxQuat(signedAngle(kPosZAxis, zDirection, cross), cross.getNormalized()))));
+			const physics::vec3_type cross(kPosZAxis.cross(zDirection));
+			helices.push_back(Helix(helix_settings, phys, numBases, physics::transform_type(vertex, physics::quaternion_type(signedAngle(kPosZAxis, zDirection, cross), cross.getNormalized()))));
 		} else if (line[0] == 'g')
 			++gcount;
 	}
@@ -30,54 +40,232 @@ bool Scene::read(physx::PxPhysics & physics, physx::PxScene & scene, std::ifstre
 		return false;
 	}
 
-	assert(helices.empty() || helices.size() == path.size() - 1);
-	return helices.empty() ? setupHelices(physics, scene) : true;
+	if ((!helices.empty() && helices.size() != path.size() - 1) || path.empty() || vertices.empty())
+		return false;
+
+	if (!helices.empty()) {
+		PRINT("Not implemented yet! Helices can't be provided!");
+		return false;
+	}
+
+	return helices.empty() ? setupHelices(phys) : true;
 }
 
-bool Scene::setupHelices(physx::PxPhysics & physics, physx::PxScene & scene) {
-	{
-		std::vector<unsigned int>::const_iterator it(path.begin());
-		std::vector<unsigned int>::const_iterator prev_it(it++);
+std::hash<unsigned int> scene::Edge::hasher;
 
-		for (; it != path.end(); ++it, ++prev_it) {
-			const physx::PxVec3 & vertex1(vertices[*prev_it].position), &vertex2(vertices[*it].position);
-			physx::PxVec3 origo((vertex1 + vertex2) / 2), direction(vertex2 - vertex1);
-			const physx::PxReal length(direction.normalize());
-			const physx::PxVec3 cross(kPosZAxis.cross(direction));
-			helices.push_back(Helix(physics, scene, DNA::DistanceToBaseCount(length), physx::PxTransform(origo, physx::PxQuat(signedAngle(kPosZAxis, direction, cross), cross.getNormalized()))));
+bool scene::setupHelices(physics & phys) {
+	// Find duplicate edges.
+	std::unordered_map<Edge, int, std::function<size_t(const Edge &)>> duplicates(path.size() - 1, std::mem_fun_ref(&Edge::hash));
+
+	for (std::vector<unsigned int>::const_iterator it(path.begin()); it != path.end(); ++it) {
+		++duplicates[Edge(*it, *circular_increment(it, path))];
+		edges.push_back(Edge(*it, *circular_increment(it, path)));
+	}	
+
+	for (std::vector<Edge>::const_iterator it(edges.begin()); it != edges.end(); ++it) {
+		for (int i = 0; i < 2; ++i)
+			vertices[it->vertices[i]].neighbor_edges.push_back(Vertex::Edge(unsigned int(std::distance(edges.cbegin(), it))));
+	}
+
+	// Calculate vertex normal and edge angles.
+	for (std::vector<Vertex>::iterator vertex_it(vertices.begin()); vertex_it != vertices.end(); ++vertex_it) {
+		Vertex & vertex(*vertex_it);
+		const unsigned int vertexIndex(unsigned int(std::distance(vertices.begin(), vertex_it)));
+
+		vertex.normal = kZeroVec;
+		for (Vertex::NeighborContainer::const_iterator it(vertex.neighbor_edges.begin()); it != vertex.neighbor_edges.end(); ++it)
+			vertex.normal += (vertex.position - vertices[edges[it->index].other(vertexIndex)].position) / physics::real_type(duplicates.at(edges[it->index]));
+
+		vertex.normal.normalize();
+		physics::vec3_type tangent((vertices[edges[vertex.neighbor_edges.front().index].other(vertexIndex)].position - vertex.position).getNormalized());
+		tangent -= proj(tangent, vertex.normal);
+
+		for (Vertex::Edge & edge : vertex.neighbor_edges) {
+			const physics::vec3_type delta(vertices[edges[edge.index].other(vertexIndex)].position - vertex.position);
+			edge.angle = signedAngle(delta - proj(delta, vertex.normal), tangent, vertex.normal);
 		}
+	}
+
+	// Correct angles for edges visited multiple times.
+	for (std::vector<unsigned int>::const_iterator it(path.begin()); it != path.end(); ++it) {
+		const std::vector<unsigned int>::const_iterator next_it(circular_increment(it, path));
+		const Edge edge(*it, *next_it);
+		const unsigned int it_offset(unsigned int(std::distance(path.cbegin(), it)));
+		assert(duplicates[edge] >= 1);
+
+		if (duplicates[edge] > 1) {
+			Vertex *vertices_[] = { &vertices[edge.vertices[0]], &vertices[edge.vertices[1]] };
+
+			const physics::vec3_type direction(vertices_[1]->position - vertices_[0]->position);
+
+			const unsigned int connecting_vertex_indices[] = { *circular_increment(next_it, path), *circular_decrement(it, path) };
+
+			physics::vec3_type tangent(kZeroVec);
+			for (int i = 0; i < 2; ++i) {
+				if (connecting_vertex_indices[i] != edge.vertices[i]) {
+					const physics::vec3_type upcoming_direction(vertices[connecting_vertex_indices[i]].position - vertices_[i ^ 1]->position);
+					tangent += upcoming_direction - proj(upcoming_direction, direction);
+				}
+			}
+
+			const Vertex::NeighborContainer::iterator neighbor_edge_it(std::find(vertices_[0]->neighbor_edges.begin(), vertices_[0]->neighbor_edges.end(), it_offset));
+			assert(neighbor_edge_it != vertices_[0]->neighbor_edges.end());
+
+			neighbor_edge_it->angle += sgn_nozero(direction.cross(vertices_[0]->normal).dot(tangent)) * physics::real_type(ANGLE_EPSILON);
+		}
+	}
+
+	for (const Vertex & vertex : vertices)
+		assert(vertex.neighbor_edges.size() % 2 == 0);
+
+	// Sort edges by angle and create the edge lookup.
+	std::for_each(vertices.begin(), vertices.end(), std::mem_fun_ref(&Vertex::generate_lookup));
+
+	for (std::vector<unsigned int>::const_iterator it(path.begin()); it != path.end(); ++it) {
+		const std::vector<unsigned int>::const_iterator next_it(circular_increment(it, path));
+		const Edge edge(*it, *next_it);
+		Vertex *vertices_[] = { &vertices[edge.vertices[0]], &vertices[edge.vertices[1]] };
+		const Vertex::NeighborContainer::iterator neighbor_edge_it(std::find_if(vertices_[0]->neighbor_edges.begin(), vertices_[0]->neighbor_edges.end(), [this, &edge](const Vertex::Edge & vertex_edge) { return edges[vertex_edge.index].other(edge.vertices[0]) == edge.vertices[1]; }));
+		assert(neighbor_edge_it != vertices_[0]->neighbor_edges.end());
+
+		const physics::vec3_type origo((vertices_[0]->position + vertices_[1]->position) / 2), direction(vertices_[1]->position - vertices_[0]->position);
+
+		std::set<unsigned int> vertices_unique_neighbors[2];
+		for (int i = 0; i < 2; ++i) {
+			for (const Vertex::Edge & vertex_edge : vertices_[i]->neighbor_edges)
+				vertices_unique_neighbors[i].insert(edges[vertex_edge.index].other(edge.vertices[i]));
+		}
+
+		physics::vec3_type tangent(kZeroVec);
+		const unsigned int connecting_vertex_indices[] = { *circular_increment(next_it, path), *circular_decrement(it, path) };
+		bool cross(false);
+
+		if (duplicates[edge] > 1) {
+			for (int i = 0; i < 2; ++i) {
+				if (connecting_vertex_indices[i] != edge.vertices[i]) {
+					const physics::vec3_type upcoming_direction(vertices[connecting_vertex_indices[i]].position - vertices_[i ^ 1]->position);
+					tangent += upcoming_direction - proj(upcoming_direction, direction);
+				} else
+					cross = true;
+			}
+
+			tangent.normalize();
+		} else
+			cross = (vertices[connecting_vertex_indices[0]].position - vertices_[1]->position).dot(vertices[connecting_vertex_indices[1]].position - vertices_[0]->position) < 0;
+
+		double length(direction.magnitude() - apothem(2 * DNA::RADIUS, vertices_unique_neighbors[0].size()) - apothem(2 * DNA::RADIUS, vertices_unique_neighbors[1].size()));
+#if 1
+		PRINT_NORETURN("Original length: %f", length);
+		const double num_half_turns(length / DNA::HALF_TURN_LENGTH);
+		if (int(std::floor(num_half_turns)) % 2)
+			length = DNA::HALF_TURN_LENGTH * (cross ? std::floor(num_half_turns) : std::ceil(num_half_turns));
+		else
+			length = DNA::HALF_TURN_LENGTH * (cross ? std::ceil(num_half_turns) : std::floor(num_half_turns));
+		printf(" is now %f\n", length);
+#endif
+
+		helices.emplace_back(
+			helix_settings,
+			phys, DNA::DistanceToBaseCount(length),
+			physics::transform_type((origo + tangent * physics::real_type((duplicates[edge] - 1) * (DNA::RADIUS + DNA::SPHERE_RADIUS))) * settings.initial_scaling, rotationFromTo(kPosZAxis, direction)));
 	}
 
 	// Connect the scaffold.
-	{
-		std::vector<Helix>::iterator it(helices.begin());
-		std::vector<Helix>::iterator prev_it(it++);
-
-		for (; it != helices.end(); ++it, ++prev_it) {
-			// TODO:
-			//prev_it->attach(physics, *it, Helix::kForwardThreePrime, Helix::kForwardFivePrime);
-		}
-	}
+	for (HelixContainer::iterator it(helices.begin()); it != helices.end(); ++it)
+		circular_decrement(it, helices)->attach(phys, *it, Helix::kForwardThreePrime, Helix::kForwardFivePrime);
 
 	// Connect the staples.
 
-	// Sketch: Iterate over the path, look at where the two edges are going, if positive, look for the closest other edge at this vertex with a negative angle, if not do the inverse.
+	for (std::vector<Edge>::const_iterator it(edges.begin()); it != edges.end(); ++it) {
+		const Vertex & vertex(vertices[it->vertices[1]]);
+		const unsigned int it_offset(unsigned int(std::distance(edges.cbegin(), it)));
+		const unsigned int next_it_offset(unsigned int(circular_index(it_offset + 1, edges.size())));
+		const Vertex::NeighborContainer::const_iterator edge_it(vertex.edges_lookup.at(it_offset));
+		const Vertex::NeighborContainer::const_iterator next_edge_it(vertex.edges_lookup.at(next_it_offset));
+		assert(edge_it != vertex.neighbor_edges.end() && next_edge_it != vertex.neighbor_edges.end());
+
+		for (Vertex::NeighborContainer::const_iterator nit(vertex.neighbor_edges.begin()); nit != vertex.neighbor_edges.end() - 1; ++nit) {
+			if (nit->angle == (nit + 1)->angle)
+				PRINT("Angles are the same for edges %u and %u at vertex %u leading to vertices %u and %u. Vertex normal: %f, %f, %f", 1 + nit->index, 1 + (nit + 1)->index, 1 + it->vertices[1], 1 + edges[nit->index].other(it->vertices[1]), 1 + edges[(nit + 1)->index].other(it->vertices[1]), vertices[it->vertices[1]].normal.x, vertices[it->vertices[1]].normal.y, vertices[it->vertices[1]].normal.z);
+			assert(nit->angle != (nit + 1)->angle);
+		}
+
+		const int delta(int(next_edge_it - edge_it));
+		assert(std::abs(delta) == 1 || std::abs(delta) == int(vertex.neighbor_edges.size() - 1));
+		const ptrdiff_t edge_it_offset(std::distance(vertex.neighbor_edges.cbegin(), edge_it));
+		const size_t staple_edge(circular_index(edge_it_offset + sgn_nozero(delta) * ((std::abs(delta) > 1) * 2 - 1), vertex.neighbor_edges.size()));
+		
+		assert(unsigned int((edge_it_offset + vertex.neighbor_edges.size() + sgn_nozero(delta) * ((std::abs(delta) > 1) * 2 - 1)) % vertex.neighbor_edges.size()) == staple_edge);
+
+		helices[it_offset].attach(phys, helices[(vertex.neighbor_edges.begin() + staple_edge)->index], Helix::kBackwardFivePrime, Helix::kBackwardThreePrime);
+	}
 
 	return true;
 }
 
-bool Scene::write(std::ofstream & ofile) const {
-	for (const Vertex & vertex : vertices)
-		ofile << "v " << vertex.position.x << ' ' << vertex.position.y << ' ' << vertex.position.z << std::endl;
+void scene::getTotalSeparationMinMaxAverage(physics::real_type & min, physics::real_type & max, physics::real_type & average, physics::real_type & total) const {
+	min = std::numeric_limits<physics::real_type>::infinity();
+	max = physics::real_type(0);
+	total = physics::real_type(0);
+	for (const Helix & helix : helices) {
+		const Helix::ConnectionContainer & connections(helix.getJoints());
+		for (const Helix::Connection & connection : connections) {
+			const physics::real_type separation(connection.joint->getDistance());
+			min = std::min(min, separation);
+			max = std::max(max, separation);
+			total += separation;
+		}
+	}
 
-	for (unsigned int edge : path)
-		ofile << "e " << edge << std::endl;
+	average = total / (helices.size() * 4);
+	total /= 2;
+}
+
+SceneDescription::SceneDescription(scene & scene) : totalSeparation(scene.getTotalSeparation()) {
+	helices.reserve(scene.getHelixCount());
+	std::unordered_map<const ::Helix *, Helix *> helixMap;
+	helixMap.reserve(scene.getHelixCount());
+
+	for (const ::Helix & helix : scene.helices) {
+		helices.push_back(Helix(helix.getBaseCount(), helix.getTransform()));
+		helixMap.emplace(&helix, &helices.back());
+	}
+
+	for (const ::Helix & helix : scene.helices) {
+		Helix & newHelix(*helixMap.at(&helix));
+		for (int i = 0; i < 4; ++i)
+			newHelix.connections[i] = helixMap.at(helix.getJoint(::Helix::AttachmentPoint(i)).helix);
+	}
+}
+
+bool SceneDescription::write(std::ostream & out) const {
+	std::unordered_map<const Helix *, std::string> helixNames;
+	helixNames.reserve(helices.size());
+
+	{
+		unsigned int i(1);
+		for (const Helix & helix : helices) {
+			std::ostringstream namestream;
+			namestream << "helix_" << i++;
+			const std::string name(namestream.str());
+			helixNames.emplace(&helix, name);
+
+			const physics::vec3_type & position(helix.getPosition());
+			const physics::quaternion_type & orientation(helix.getOrientation());
+			out << "hb " << name << ' ' << helix.baseCount << ' ' << position.x << ' ' << position.y << ' ' << position.z << ' ' << orientation.x << ' ' << orientation.y << ' ' << orientation.z << orientation.w << std::endl;
+		}
+	}
+
+	out << std::endl;
 
 	for (const Helix & helix : helices) {
-		const physx::PxTransform transform(helix.getTransform());
-		const physx::PxVec3 direction(transform.q.rotate(kPosZAxis));
-		ofile << "h " << helix.getBaseCount() << ' ' << transform.p.x << ' ' << transform.p.y << ' ' << transform.p.z << ' ' << direction.x << ' ' << direction.y << ' ' << direction.z << std::endl;
+		const std::string & name(helixNames.at(&helix));
+
+		out << "c " << name << " f3' " << helixNames.at(helix.connections[::Helix::kForwardThreePrime]) << " f5'" << std::endl
+			<< "c " << helixNames.at(helix.connections[::Helix::kBackwardFivePrime]) << " b3' " << name << " b5'" << std::endl;
 	}
+
+	out << std::endl << "autostaple" << std::endl << "ps " << helixNames.at(&helices.front()) << " f3'" << std::endl;
 
 	return true;
 }

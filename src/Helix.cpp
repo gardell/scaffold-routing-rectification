@@ -1,26 +1,25 @@
+#include <Definition.h>
 #include <DNA.h>
 #include <Helix.h>
 
 #include <cassert>
 #include <initializer_list>
 
-const physx::PxReal Helix::kDensity(10);
-const physx::PxReal Helix::kStaticFriction(physx::PxReal(0.5)), Helix::kDynamicFriction(physx::PxReal(0.5)), Helix::kRestitution(physx::PxReal(0.6));
-physx::PxMaterial *Helix::material(NULL);
+physics::vec3_type localFrame(Helix::AttachmentPoint point, int bases) {
+	const physics::vec3_type offset(0, 0, physics::real_type(DNA::BasesToLength(bases) / 2));
 
-physx::PxVec3 localFrame(Helix::AttachmentPoint point, int bases) {
 	switch (point) {
 	case Helix::kForwardThreePrime:
-		return physx::PxQuat(physx::PxReal(toRadians(DNA::PITCH * bases)), physx::PxVec3(0, 0, 1)).rotate(physx::PxVec3(0, 0, 1));
+		return physics::quaternion_type(physics::real_type(toRadians(DNA::BasesToRotation(bases))), kPosZAxis).rotate(physics::vec3_type(0, physics::real_type(DNA::RADIUS), 0)) + offset;
 	case Helix::kForwardFivePrime:
-		return physx::PxVec3(0, 0, 0);
+		return physics::vec3_type(0, physics::real_type(DNA::RADIUS), 0) - offset;
 	case Helix::kBackwardThreePrime:
-		return physx::PxQuat(physx::PxReal(toRadians(DNA::OPPOSITE_ROTATION)), physx::PxVec3(0, 0, 1)).rotate(physx::PxVec3(0, 0, 1));
+		return physics::quaternion_type(physics::real_type(toRadians(-DNA::OPPOSITE_ROTATION)), kPosZAxis).rotate(physics::vec3_type(0, physics::real_type(DNA::RADIUS), 0)) - offset;
 	case Helix::kBackwardFivePrime:
-		return physx::PxQuat(physx::PxReal(toRadians(DNA::PITCH * bases + DNA::OPPOSITE_ROTATION)), physx::PxVec3(0, 0, 1)).rotate(physx::PxVec3(0, 0, 1));
+		return physics::quaternion_type(physics::real_type(toRadians(DNA::BasesToRotation(bases) - DNA::OPPOSITE_ROTATION)), kPosZAxis).rotate(physics::vec3_type(0, physics::real_type(DNA::RADIUS), 0)) + offset;
 	default:
 		assert(0);
-		return physx::PxVec3();
+		return physics::vec3_type();
 	}
 }
 
@@ -38,61 +37,69 @@ std::initializer_list<Helix::AttachmentPoint> opposites(Helix::AttachmentPoint p
 	}
 }
 
-Helix::Helix(physx::PxPhysics & physics, physx::PxScene & scene, int bases, const physx::PxTransform & transform) : bases(bases) {
-	physx::PxReal length(physx::PxReal(bases * DNA::STEP));
-	assert(length > DNA::RADIUS * 2);
+void Helix::createRigidBody(physics & phys, int bases, const physics::transform_type & transform) {
+	assert(rigidBody == nullptr);
 
-	if (!material) {
-		material = physics.createMaterial(kStaticFriction, kDynamicFriction, kRestitution);
+	const physics::real_type length(physics::real_type(DNA::BasesToLength(bases)));
+	assert(length > DNA::RADIUS_PLUS_SPHERE_RADIUS * 2);
+
+	constexpr physics::real_type radius(physics::real_type(DNA::SPHERE_RADIUS * DNA::APPROXIMATION_RADIUS_MULTIPLIER));
+	constexpr physics::real_type offset(physics::real_type(DNA::RADIUS - radius + DNA::SPHERE_RADIUS));
+
+	const physics::sphere_geometry_type sphereGeometry(radius);
+	rigidBody = phys.create_rigid_body(transform, settings.density,
+		std::make_pair(physics::capsule_geometry_type(physics::real_type(DNA::RADIUS_PLUS_SPHERE_RADIUS), length / 2 - physics::real_type(DNA::RADIUS_PLUS_SPHERE_RADIUS)), physics::transform_type(physics::quaternion_type(physics::real_type(M_PI_2), kNegYAxis))),
+		std::make_pair(sphereGeometry, physics::transform_type(physics::vec3_type(0, offset, -length / 2 + radius))),
+		std::make_pair(sphereGeometry, physics::transform_type(physics::quaternion_type(physics::real_type(toRadians(-DNA::OPPOSITE_ROTATION)), physics::vec3_type(0, 0, 1)).rotate(physics::vec3_type(0, offset, -length / 2 + radius)))),
+		std::make_pair(sphereGeometry, physics::transform_type(physics::quaternion_type(physics::real_type(toRadians(DNA::PITCH * bases)), physics::vec3_type(0, 0, 1)).rotate(physics::vec3_type(0, offset, length / 2 - radius)))),
+		std::make_pair(sphereGeometry, physics::transform_type(physics::quaternion_type(physics::real_type(toRadians(DNA::PITCH * bases - DNA::OPPOSITE_ROTATION)), physics::vec3_type(0, 0, 1)).rotate(physics::vec3_type(0, offset, length / 2 - radius)))));
+	assert(rigidBody != nullptr);
+
+	if (settings.attach_fixed) {
+		fixedJoint = phys.create_spring_joint(rigidBody, physics::transform_type(kZeroVec), NULL, transform, settings.fixed_spring_stiffness, settings.spring_damping);
+		assert(rigidBody != nullptr);
 	}
 
-	rigidBody = physx::PxCreateDynamic(physics, transform, physx::PxCapsuleGeometry(physx::PxReal(DNA::RADIUS + DNA::SPHERE_RADIUS), length / 2 - physx::PxReal(DNA::RADIUS + DNA::SPHERE_RADIUS)), *material, kDensity, physx::PxTransform(physx::PxQuat(physx::PxReal(M_PI_2), physx::PxVec3(0, -1, 0))));
-
-	const physx::PxReal radius(physx::PxReal(DNA::SPHERE_RADIUS * DNA::APPROXIMATION_RADIUS_MULTIPLIER));
-	const physx::PxReal offset(physx::PxReal(DNA::RADIUS - radius + DNA::SPHERE_RADIUS));
-	rigidBody->createShape(physx::PxSphereGeometry(radius), *material)->setLocalPose(physx::PxTransform(physx::PxVec3(-length / 2 + radius, 0, offset)));
-	rigidBody->createShape(physx::PxSphereGeometry(radius), *material)->setLocalPose(physx::PxTransform(physx::PxQuat(physx::PxReal(toRadians(DNA::OPPOSITE_ROTATION)), physx::PxVec3(1, 0, 0)).rotate(physx::PxVec3(-length / 2 + radius, 0, offset))));
-
-	rigidBody->createShape(physx::PxSphereGeometry(radius), *material)->setLocalPose(physx::PxTransform(physx::PxQuat(physx::PxReal(toRadians(DNA::PITCH * bases)), physx::PxVec3(1, 0, 0)).rotate(physx::PxVec3(physx::PxReal(bases * DNA::STEP) - length / 2 - radius, 0, offset))));
-	rigidBody->createShape(physx::PxSphereGeometry(radius), *material)->setLocalPose(physx::PxTransform(physx::PxQuat(physx::PxReal(toRadians(DNA::PITCH * bases + DNA::OPPOSITE_ROTATION)), physx::PxVec3(1, 0, 0)).rotate(physx::PxVec3(physx::PxReal(bases * DNA::STEP) - length / 2 - radius, 0, offset))));
-
-	scene.addActor(*rigidBody);
+	this->bases = bases;
 }
 
-void Helix::attach(physx::PxPhysics & physics, Helix & other, AttachmentPoint thisPoint, AttachmentPoint otherPoint) {
+void Helix::destroyRigidBody(physics & phys) {
+	phys.destroy_rigid_body(rigidBody);
+	rigidBody = NULL;
+	fixedJoint = NULL;
+}
+
+void Helix::recreateRigidBody(physics & phys, int bases, const physics::transform_type & transform) {
+	const std::array< std::tuple<Helix *, AttachmentPoint, AttachmentPoint>, 4 > points{ { 
+		std::make_tuple(joints[kForwardThreePrime].helix, kForwardThreePrime, otherPoint(kForwardThreePrime, *joints[kForwardThreePrime].helix)),
+		std::make_tuple(joints[kForwardFivePrime].helix, kForwardFivePrime, otherPoint(kForwardFivePrime, *joints[kForwardFivePrime].helix)),
+		std::make_tuple(joints[kBackwardThreePrime].helix, kBackwardThreePrime, otherPoint(kBackwardThreePrime, *joints[kBackwardThreePrime].helix)),
+		std::make_tuple(joints[kBackwardFivePrime].helix, kBackwardFivePrime, otherPoint(kBackwardFivePrime, *joints[kBackwardFivePrime].helix))
+	} };
+
+	destroyRigidBody(phys);
+	createRigidBody(phys, bases, transform);
+
+	for (int i = 0; i < 4; ++i)
+		attach(phys, *std::get<0>(points[i]), std::get<1>(points[i]), std::get<2>(points[i]));
+}
+
+void Helix::attach(physics & phys, Helix & other, AttachmentPoint thisPoint, AttachmentPoint otherPoint) {
 	assert(rigidBody);
 
-	detach(thisPoint);
-	other.detach(otherPoint);
+	physics::spring_joint_type *joint(phys.create_spring_joint(rigidBody, physics::transform_type(localFrame(thisPoint, bases)), other.rigidBody, physics::transform_type(localFrame(otherPoint, other.bases)), settings.spring_stiffness, settings.spring_damping));
+	assert(joint != nullptr);
 
-	physx::PxSphericalJoint *joint(physx::PxSphericalJointCreate(physics, rigidBody, physx::PxTransform(localFrame(thisPoint, bases)), other.rigidBody, physx::PxTransform(localFrame(otherPoint, bases))));
 	joints[thisPoint].helix = &other;
 	joints[thisPoint].joint = joint;
 	other.joints[otherPoint].helix = this;
 	other.joints[otherPoint].joint = joint;
 }
 
-bool Helix::detach(AttachmentPoint point) {
-	if (joints[point].helix && joints[point].joint) {
-		PRINT("DEBUG: Don't know if this is enough to delete a joint.");
-		joints[point].joint->release(); // Is this enough to delete it?
-		for (Helix::Connection & connection : joints[point].helix->joints) {
-			if (connection.helix == this) {
-				connection = Connection();
-				return true;
-			}
-		}
-
-		assert(0);
-	}
-
-	return false;
-}
-
-physx::PxReal Helix::getSeparation(AttachmentPoint atPoint) {
-	const physx::PxVec3 attachmentPoint0(physx::PxMat44(rigidBody->getGlobalPose()).transform(localFrame(atPoint, bases)));
+physics::real_type Helix::getSeparation(AttachmentPoint atPoint) const {
+	const physics::vec3_type attachmentPoint0(physics::transform(physics::world_transform(*rigidBody), localFrame(atPoint, bases)));
 	const Helix & other(*joints[atPoint].helix);
-	const physx::PxVec3 attachmentPoint1(physx::PxMat44(other.rigidBody->getGlobalPose()).transform(localFrame(otherPoint(atPoint, other), other.bases)));
+	const physics::vec3_type attachmentPoint1(physics::transform(physics::world_transform(*other.rigidBody), localFrame(otherPoint(atPoint, other), other.bases)));
 	return (attachmentPoint1 - attachmentPoint0).magnitude();
 }
 
