@@ -86,9 +86,10 @@ void Helix::recreateRigidBody(physics & phys, int bases, const physics::transfor
 
 void Helix::attach(physics & phys, Helix & other, AttachmentPoint thisPoint, AttachmentPoint otherPoint) {
 	assert(rigidBody);
+	//assert(joints[thisPoint].helix == nullptr && joints[thisPoint].joint == nullptr && other.joints[otherPoint].helix == nullptr && other.joints[otherPoint].joint == nullptr);
 
 	physics::spring_joint_type *joint(phys.create_spring_joint(rigidBody, physics::transform_type(localFrame(thisPoint, bases)), other.rigidBody, physics::transform_type(localFrame(otherPoint, other.bases)), settings.spring_stiffness, settings.spring_damping));
-	assert(joint != nullptr);
+	assert(joint);
 
 	joints[thisPoint].helix = &other;
 	joints[thisPoint].joint = joint;

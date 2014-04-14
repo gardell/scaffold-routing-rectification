@@ -41,7 +41,7 @@ public:
 	inline physics::real_type getTotalSeparation() const {
 		physics::real_type totalSeparation(0);
 		for (const Helix & helix : helices)
-			totalSeparation += std::accumulate(helix.getJoints().begin(), helix.getJoints().end(), physics::real_type(0), [](physics::real_type & separation, const Helix::Connection & connection) { return separation + connection.joint->getDistance(); });
+			totalSeparation += std::accumulate(helix.getJoints().begin(), helix.getJoints().end(), physics::real_type(0), [](physics::real_type & separation, const Helix::Connection & connection) { return separation + (connection ? connection.joint->getDistance() : physics::real_type(0)); });
 
 		return totalSeparation / 2;
 	}

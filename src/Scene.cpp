@@ -20,6 +20,8 @@ bool scene::read(physics & phys, std::ifstream & ifile) {
 	unsigned int gcount(0);
 	std::string line;
 
+	unsigned int vn_index = 0; // DEBUG
+
 	while (ifile.good()) {
 		std::getline(ifile, line);
 
@@ -73,16 +75,23 @@ bool scene::setupHelices(physics & phys) {
 		const unsigned int vertexIndex(unsigned int(std::distance(vertices.begin(), vertex_it)));
 
 		vertex.normal = kZeroVec;
-		for (Vertex::NeighborContainer::const_iterator it(vertex.neighbor_edges.begin()); it != vertex.neighbor_edges.end(); ++it)
-			vertex.normal += (vertex.position - vertices[edges[it->index].other(vertexIndex)].position) / physics::real_type(duplicates.at(edges[it->index]));
+		for (Vertex::NeighborContainer::const_iterator it(vertex.neighbor_edges.begin()); it != vertex.neighbor_edges.end(); ++it) {
+			const physics::vec3_type edge1(vertex.position - vertices[edges[circular_increment(it, vertex.neighbor_edges)->index].other(vertexIndex)].position);
+			const physics::vec3_type edge2(vertex.position - vertices[edges[it->index].other(vertexIndex)].position);
+			vertex.normal += edge1.getNormalized().cross(edge2.getNormalized());
+		}
 
 		vertex.normal.normalize();
+
+		std::cerr << "vertex " << vertexIndex << " normal: " << vertex.normal.x << ' ' << vertex.normal.y << ' ' << vertex.normal.z << std::endl;
+
 		physics::vec3_type tangent((vertices[edges[vertex.neighbor_edges.front().index].other(vertexIndex)].position - vertex.position).getNormalized());
 		tangent -= proj(tangent, vertex.normal);
 
 		for (Vertex::Edge & edge : vertex.neighbor_edges) {
 			const physics::vec3_type delta(vertices[edges[edge.index].other(vertexIndex)].position - vertex.position);
-			edge.angle = signedAngle(delta - proj(delta, vertex.normal), tangent, vertex.normal);
+			//edge.angle = signedAngle(delta - proj(delta, vertex.normal), tangent, vertex.normal);
+			edge.angle = signedAngle(tangent, delta - proj(delta, vertex.normal), vertex.normal);
 		}
 	}
 
@@ -111,7 +120,18 @@ bool scene::setupHelices(physics & phys) {
 			const Vertex::NeighborContainer::iterator neighbor_edge_it(std::find(vertices_[0]->neighbor_edges.begin(), vertices_[0]->neighbor_edges.end(), it_offset));
 			assert(neighbor_edge_it != vertices_[0]->neighbor_edges.end());
 
-			neighbor_edge_it->angle += sgn_nozero(direction.cross(vertices_[0]->normal).dot(tangent)) * physics::real_type(ANGLE_EPSILON);
+			//neighbor_edge_it->angle += sgn_nozero(direction.cross(vertices_[0]->normal).dot(tangent)) * physics::real_type(ANGLE_EPSILON);
+			neighbor_edge_it->angle -= sgn_nozero(direction.cross(vertices_[0]->normal).dot(tangent)) * physics::real_type(ANGLE_EPSILON);
+		}
+	}
+
+	// Validate angles for debugging
+	for (const Edge & edge : edges) {
+		const Vertex & vertex(vertices[edge.vertices[1]]);
+		for (Vertex::NeighborContainer::const_iterator nit(vertex.neighbor_edges.begin()); nit != vertex.neighbor_edges.end() - 1; ++nit) {
+			if (nit->angle == (nit + 1)->angle)
+				PRINT("Angles are the same for edges %u and %u at vertex %u leading to vertices %u and %u. Vertex normal: %f, %f, %f", 1 + nit->index, 1 + (nit + 1)->index, 1 + edge.vertices[1], 1 + edges[nit->index].other(edge.vertices[1]), 1 + edges[(nit + 1)->index].other(edge.vertices[1]), vertices[edge.vertices[1]].normal.x, vertices[edge.vertices[1]].normal.y, vertices[edge.vertices[1]].normal.z);
+			assert(nit->angle != (nit + 1)->angle);
 		}
 	}
 
@@ -155,13 +175,13 @@ bool scene::setupHelices(physics & phys) {
 
 		double length(direction.magnitude() - apothem(2 * DNA::RADIUS, vertices_unique_neighbors[0].size()) - apothem(2 * DNA::RADIUS, vertices_unique_neighbors[1].size()));
 #if 1
-		PRINT_NORETURN("Original length: %f", length);
+		//PRINT_NORETURN("Original length: %f", length);
 		const double num_half_turns(length / DNA::HALF_TURN_LENGTH);
 		if (int(std::floor(num_half_turns)) % 2)
 			length = DNA::HALF_TURN_LENGTH * (cross ? std::floor(num_half_turns) : std::ceil(num_half_turns));
 		else
 			length = DNA::HALF_TURN_LENGTH * (cross ? std::ceil(num_half_turns) : std::floor(num_half_turns));
-		printf(" is now %f\n", length);
+		//printf(" is now %f\n", length);
 #endif
 
 		helices.emplace_back(
@@ -200,6 +220,24 @@ bool scene::setupHelices(physics & phys) {
 		helices[it_offset].attach(phys, helices[(vertex.neighbor_edges.begin() + staple_edge)->index], Helix::kBackwardFivePrime, Helix::kBackwardThreePrime);
 	}
 
+	/*for (std::vector<Edge>::const_iterator prev_it(edges.begin()); prev_it != edges.end(); ++prev_it) {
+		const Vertex & vertex(vertices[prev_it->vertices[1]]);
+
+		const size_t prev_it_offset(std::distance(edges.cbegin(), prev_it));
+		const std::vector<Edge>::const_iterator next_it(circular_increment(prev_it, edges));
+		const size_t next_it_offset(std::distance(edges.cbegin(), next_it));
+
+		const Vertex::NeighborContainer::const_iterator prev_edge_it(vertex.edges_lookup.at(unsigned int(prev_it_offset)));
+		const Vertex::NeighborContainer::const_iterator next_edge_it(vertex.edges_lookup.at(unsigned int(next_it_offset)));
+
+		const ptrdiff_t delta(next_edge_it - prev_edge_it);
+		assert(std::abs(delta) == 1 || size_t(std::abs(delta)) == vertex.neighbor_edges.size() - 1);
+
+		if (std::abs(delta) == 1) {
+			helices[prev_it_offset].attach(phys, helices[prev_it_offset - delta], Helix::kBackwardFivePrime, Helix::kBackwardThreePrime);
+		}
+	}*/
+
 	return true;
 }
 
@@ -207,14 +245,24 @@ void scene::getTotalSeparationMinMaxAverage(physics::real_type & min, physics::r
 	min = std::numeric_limits<physics::real_type>::infinity();
 	max = physics::real_type(0);
 	total = physics::real_type(0);
+	size_t helix_offset = 0; // DEBUG
 	for (const Helix & helix : helices) {
 		const Helix::ConnectionContainer & connections(helix.getJoints());
+		size_t connection_offset = 0; // DEBUG
 		for (const Helix::Connection & connection : connections) {
+			if (connection.joint == nullptr) { // DEBUG ONLY
+				PRINT("WARNING: Joint is null, should not happen! connection: %u, helix: %u", connection_offset, helix_offset);
+				continue;
+			}
 			const physics::real_type separation(connection.joint->getDistance());
 			min = std::min(min, separation);
 			max = std::max(max, separation);
 			total += separation;
+
+			connection_offset++; // DEBUG
 		}
+
+		helix_offset++; // DEBUG
 	}
 
 	average = total / (helices.size() * 4);
