@@ -14,6 +14,18 @@
 #include <cassert>
 #include <vector>
 
+/*
+ * Helper string methods
+ */
+
+inline bool ends_with(const std::string & haystack, const std::string & needle) {
+	return haystack.find_last_of(needle) == haystack.length() - 1;
+}
+
+inline std::string strip_trailing_string(const std::string & str, const std::string & trailing) {
+	return str.substr(0, str.length() - trailing.length());
+}
+
 #ifdef __GNUC__
 
 #ifndef likely

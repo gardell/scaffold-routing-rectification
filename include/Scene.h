@@ -21,13 +21,27 @@ public:
 
 	struct settings_type {
 		physics::real_type initial_scaling;
+		bool discretize_lengths;
 	};
 
-	explicit inline scene(const settings_type & settings, const ::Helix::settings_type & helix_settings) : settings(settings), helix_settings(helix_settings) {}
+	inline scene(const settings_type & settings, const ::Helix::settings_type & helix_settings) : settings(settings), helix_settings(helix_settings) {}
+
+	// Distinguish the file type by its file ending and parses either a rmesh or a ply file.
+	inline bool read(physics & phys, const std::string & filename) {
+		if (ends_with(filename, ".ply"))
+			return read_ply(phys, std::ifstream(filename), std::ifstream(strip_trailing_string(filename, ".ply") + ".ntrail"));
+		else if (ends_with(filename, ".ntrail"))
+			return read_ply(phys, std::ifstream(strip_trailing_string(filename, ".ntrail") + ".ply"), std::ifstream(filename));
+		else
+			return read_rmesh(phys, std::ifstream(filename));
+	}
 
 	// Reads a mesh in the .rmsh "Routed mesh" text based format from the scaffold-routing Maya exporter project.
 	// TODO: Move to SceneDescription?
-	bool read(physics & phys, std::ifstream & ifile);
+	bool read_rmesh(physics & phys, std::istream & ifile);
+
+	// Read a mesh using the .ply and .ntrail formats
+	bool read_ply(physics &phys, std::istream & ply_file, std::istream & ntrail_file);
 
 	inline HelixContainer & getHelices() {
 		return helices;

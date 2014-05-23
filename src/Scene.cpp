@@ -9,18 +9,17 @@
 #include <string>
 #include <cstdio>
 #include <iostream>
+#include <iterator>
 #include <set>
 #include <sstream>
 #include <string>
 #include <unordered_map>
 
-bool scene::read(physics & phys, std::ifstream & ifile) {
+bool scene::read_rmesh(physics & phys, std::istream & ifile) {
 	physics::vec3_type vertex, zDirection;
 	unsigned int edge, numBases;
 	unsigned int gcount(0);
 	std::string line;
-
-	unsigned int vn_index = 0; // DEBUG
 
 	while (ifile.good()) {
 		std::getline(ifile, line);
@@ -51,6 +50,35 @@ bool scene::read(physics & phys, std::ifstream & ifile) {
 	}
 
 	return helices.empty() ? setupHelices(phys) : true;
+}
+
+bool scene::read_ply(physics & phys, std::istream & ply_file, std::istream & ntrail_file) {
+	std::string line;
+	unsigned int count(0), num_vertices(0);
+	bool has_vertex_header(false);
+	unsigned int pre_vertices_rows(0);
+	physics::vec3_type vertex;
+
+	while (ply_file.good()) {
+		std::getline(ply_file, line);
+
+		if (sscanf(line.c_str(), "element vertex %u", &num_vertices) == 1) {
+			vertices.reserve(num_vertices);
+			has_vertex_header = true;
+		} else if (sscanf(line.c_str(), "element %*s %u", &count) == 1) {
+			if (!has_vertex_header)
+				pre_vertices_rows += count;
+		} else if (line.compare(0, strlen("end_header"), "end_header") == 0) {
+			for (unsigned int i = 0; i < pre_vertices_rows; ++i)
+				std::getline(ply_file, line);
+		} else if (sscanf(line.c_str(), "%f %f %f", &vertex.x, &vertex.y, &vertex.z) == 3 && vertices.size() < num_vertices) {
+			vertices.push_back(vertex);
+		}
+	}
+
+	std::copy(std::istream_iterator<unsigned int>(ntrail_file), std::istream_iterator<unsigned int>(), std::back_inserter(path));
+
+	return setupHelices(phys);
 }
 
 std::hash<unsigned int> scene::Edge::hasher;
@@ -174,15 +202,14 @@ bool scene::setupHelices(physics & phys) {
 			cross = (vertices[connecting_vertex_indices[0]].position - vertices_[1]->position).dot(vertices[connecting_vertex_indices[1]].position - vertices_[0]->position) < 0;
 
 		double length(direction.magnitude() - apothem(2 * DNA::RADIUS, vertices_unique_neighbors[0].size()) - apothem(2 * DNA::RADIUS, vertices_unique_neighbors[1].size()));
-#if 1
-		//PRINT_NORETURN("Original length: %f", length);
-		const double num_half_turns(length / DNA::HALF_TURN_LENGTH);
-		if (int(std::floor(num_half_turns)) % 2)
-			length = DNA::HALF_TURN_LENGTH * (cross ? std::floor(num_half_turns) : std::ceil(num_half_turns));
-		else
-			length = DNA::HALF_TURN_LENGTH * (cross ? std::ceil(num_half_turns) : std::floor(num_half_turns));
-		//printf(" is now %f\n", length);
-#endif
+
+		if (settings.discretize_lengths) {
+			const double num_half_turns(length / DNA::HALF_TURN_LENGTH);
+			if (int(std::floor(num_half_turns)) % 2)
+				length = DNA::HALF_TURN_LENGTH * (cross ? std::floor(num_half_turns) : std::ceil(num_half_turns));
+			else
+				length = DNA::HALF_TURN_LENGTH * (cross ? std::ceil(num_half_turns) : std::floor(num_half_turns));
+		}
 
 		helices.emplace_back(
 			helix_settings,

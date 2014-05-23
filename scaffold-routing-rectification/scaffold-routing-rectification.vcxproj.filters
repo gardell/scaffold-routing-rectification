@@ -56,5 +56,14 @@
     <ClInclude Include="..\include\Physics.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="..\include\popt.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="..\include\poptdll.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="..\include\ParseSettings.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
   </ItemGroup>
 </Project>

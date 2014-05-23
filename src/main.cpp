@@ -1,6 +1,7 @@
 #include <Definition.h>
 #include <DNA.h>
 #include <Utility.h>
+#include <ParseSettings.h>
 #include <Scene.h>
 #include <SimulatedAnnealing.h>
 
@@ -9,6 +10,7 @@
 #include <cstdio>
 #include <cstdlib>
 #include <iostream>
+#include <string>
 #include <vector>
 
 #include <Physics.h>
@@ -123,41 +125,35 @@ SceneDescription simulated_rectification(scene & mesh, physics & phys, RunningFu
 int main(int argc, const char **argv) {
 	seed();
 
-	if (argc != 3) {
-		std::cerr << "Usage: " << argv[0] << " <input file> <output file>" << std::endl << "\tExample: " << argv[0] << " input.rmsh output.vhelix" << std::endl;
+	physics::settings_type physics_settings;
+	scene::settings_type scene_settings;
+	Helix::settings_type helix_settings;
+
+	std::string input_file, output_file;
+	parse_settings::parse(argc, argv, physics_settings, scene_settings, helix_settings, input_file, output_file);
+
+	if (input_file.empty() || output_file.empty() || argc < 3) {
+		std::cerr << parse_settings::usage(argv[0]) << std::endl;
 		return 0;
 	}
 
-	physics::settings_type physics_settings;
-	physics_settings.kStaticFriction = physics::real_type(0.5);
-	physics_settings.kDynamicFriction = physics::real_type(0.5);
-	physics_settings.kRestitution = physics::real_type(1.0);
-	physics_settings.kRigidBodySleepThreshold = physics::real_type(0.001);
-	physics_settings.visual_debugger = true;
+	scene mesh(scene_settings, helix_settings);
 	physics phys(physics_settings);
 
-	scene::settings_type scene_settings;
-	scene_settings.initial_scaling = physics::real_type(1.0);
-	Helix::settings_type helix_settings;
-	helix_settings.attach_fixed = true;
-	helix_settings.density = physics::real_type(10);
-	helix_settings.spring_stiffness = physics::real_type(100);
-	helix_settings.fixed_spring_stiffness = physics::real_type(1000);
-	helix_settings.spring_damping = physics::real_type(100);
-	scene mesh(scene_settings, helix_settings);
-
-	std::ifstream infile(argv[1]);
-	if (!mesh.read(phys, infile)) {
-		std::cerr << "Failed to read scene \"" << argv[1] << "\"" << std::endl;
-		return 1;
+	try {
+		if (!mesh.read(phys, input_file)) {
+			std::cerr << "Failed to read scene \"" << input_file << "\"" << std::endl;
+			return 1;
+		}
 	}
-	infile.close();
+	catch (const std::runtime_error & e) {
+		std::cerr << "Failed to read scene \"" << input_file << "\": " << e.what() << std::endl;
+	}
 
-	//const physics::real_type initialSeparation(mesh.getTotalSeparation());
 	physics::real_type initialmin, initialmax, initialaverage, initialtotal, min, max, average, total;
 	mesh.getTotalSeparationMinMaxAverage(initialmin, initialmax, initialaverage, initialtotal);
 
-	std::cerr << "Running simulation for scene loaded from \"" << argv[1] << "\"." << std::endl
+	std::cerr << "Running simulation for scene loaded from \"" << input_file << " outputting to " << output_file << "\"." << std::endl
 		<< "Initial: min: " << initialmin << ", max: " << initialmax << ", average: " << initialaverage << ", total: " << initialtotal << " nm" << std::endl
 		<< "Connect with NVIDIA PhysX Visual Debugger to " << PVD_HOST << ':' << PVD_PORT << " to visualize the progress. " << std::endl
 		<< "Press ^C to stop the relaxation...." << std::endl;
@@ -182,12 +178,12 @@ int main(int argc, const char **argv) {
 	std::cerr << "Result: min: " << min << ", max: " << max << ", average: " << average << ", total: " << total << " nm" << std::endl;
 
 	{
-		std::ofstream outfile(argv[2]);
-		outfile << "# Relaxation of original " << argv[1] << " file. " << mesh.getHelixCount() << " helices." << std::endl
+		std::ofstream outfile(output_file);
+		outfile << "# Relaxation of original " << input_file << " file. " << mesh.getHelixCount() << " helices." << std::endl
 			<< "# Total separation: Initial: min: " << initialmin << ", max: " << initialmax << ", average: " << initialaverage << ", total: " << initialtotal << " nm" << ", final: min: " << min << ", max: " << max << ", average: " << average << ", total: " << total << " nm" << std::endl;
 
 		if (!best_scene.write(outfile))
-			std::cerr << "Failed to write resulting mesh to \"" << argv[2] << "\"" << std::endl;
+			std::cerr << "Failed to write resulting mesh to \"" << output_file << "\"" << std::endl;
 
 		outfile.close();
 	}
