@@ -46,7 +46,7 @@ public:
 
 		parse_settings parser( {
 			make_argument("scaling", scene_settings.initial_scaling, std::ptr_fun(&atof)),
-			make_argument("scaling", scene_settings.discretize_lengths, string_to_bool()),
+			make_argument("discretize_lengths", scene_settings.discretize_lengths, string_to_bool()),
 
 			make_argument("density", helix_settings.density, std::ptr_fun(&atof)),
 			make_argument("spring_stiffness", helix_settings.spring_stiffness, std::ptr_fun(&atof)),
@@ -72,6 +72,7 @@ public:
 			<< "\t--input=<filename>" << std::endl
 			<< "\t--output=<filename>" << std::endl
 			<< "\t[ --scaling=<decimal> ]" << std::endl
+			<< "\t[ --discretize_lengths=<true|false> ]" << std::endl
 			<< "\t[ --density=<decimal> ]" << std::endl
 			<< "\t[ --spring_stiffness=<decimal> ]" << std::endl
 			<< "\t[ --fixed_spring_stiffness=<decimal> ]" << std::endl
