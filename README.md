@@ -28,7 +28,7 @@ Usage: scaffold-routing-rectification.exe
 Usually, the rectification is run as:
 
 
-scaffold-routing-rectification.exe --input=inputfile.rmsh --output=outputfile.vhelix
+scaffold-routing-rectification.exe --input=inputfile.rmsh --output=outputfile.rpoly
 
 The visual_debugger is only available when doing a debug build. For this to work, use the scaffold-routing-rectification.exe from x64/Debug/ and PhysX3CHECKED_x64.dll, PhysX3CommonCHECKED_x64.dll from scaffold-routing-rectification/. These require Visual Studio 2013 to be installed for debug builds of the Visual C++ Runtime.
 
