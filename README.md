@@ -35,3 +35,14 @@ The visual_debugger is only available when doing a debug build. For this to work
 To use the visual_debugger, start NVIDIA PhysX Visual Debugger *before* the scaffold-routing-rectification.exe.
 
 Currently, lengths are discretized taking into account their routing. To disable this, use --discretize_lengths=false
+
+vHelix
+==============================
+
+To import the resulting rpoly into vHelix (http://vhelix.net/), in Autodesk Maya click File > Import... then pick any rpoly file.
+
+The importer takes additional arguments, these can be given together with the MEL command for importing files. The two valid arguments are "nicking_min_length" and "nicking_max_length".
+nicking_min_length sets the minimum length an edge must be in order for it to be nicked. nicking_max_length decides how many times the accumulated non-nicked strand will be divided.
+
+An example usage of the file command:
+file -options "nicking_min_length=28;nicking_max_length=28" -import -type "Text based vhelix" -ra true -mergeNamespacesOnClash false -namespace "bent_rod"  -pr "C:/Users/Johan/Documents/Clones/scaffold-routing-rectification/bent_rod.rpoly";
