@@ -148,6 +148,7 @@ int main(int argc, const char **argv) {
 	}
 	catch (const std::runtime_error & e) {
 		std::cerr << "Failed to read scene \"" << input_file << "\": " << e.what() << std::endl;
+		return 1;
 	}
 
 	physics::real_type initialmin, initialmax, initialaverage, initialtotal, min, max, average, total;

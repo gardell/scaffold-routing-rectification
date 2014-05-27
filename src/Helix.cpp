@@ -42,19 +42,27 @@ void Helix::createRigidBody(physics & phys, int bases, const physics::transform_
 
 	const physics::real_type length(physics::real_type(DNA::BasesToLength(bases)));
 	//assert(length > DNA::RADIUS_PLUS_SPHERE_RADIUS * 2);
-	if (length <= DNA::RADIUS_PLUS_SPHERE_RADIUS * 2)
+	if (length <= 0/*DNA::RADIUS_PLUS_SPHERE_RADIUS * 2*/)
 		throw std::runtime_error("Helix length is too short. Rescale the structure so that the length of the structure is at least the diameter of the cylinder approximation. This is because PhysX forces us to approximate helices as capsules.");
 
 	constexpr physics::real_type radius(physics::real_type(DNA::SPHERE_RADIUS * DNA::APPROXIMATION_RADIUS_MULTIPLIER));
 	constexpr physics::real_type offset(physics::real_type(DNA::RADIUS - radius + DNA::SPHERE_RADIUS));
 
 	const physics::sphere_geometry_type sphereGeometry(radius);
-	rigidBody = phys.create_rigid_body(transform, settings.density,
-		std::make_pair(physics::capsule_geometry_type(physics::real_type(DNA::RADIUS_PLUS_SPHERE_RADIUS), length / 2 - physics::real_type(DNA::RADIUS_PLUS_SPHERE_RADIUS)), physics::transform_type(physics::quaternion_type(physics::real_type(M_PI_2), kNegYAxis))),
-		std::make_pair(sphereGeometry, physics::transform_type(physics::vec3_type(0, offset, -length / 2 + radius))),
-		std::make_pair(sphereGeometry, physics::transform_type(physics::quaternion_type(physics::real_type(toRadians(-DNA::OPPOSITE_ROTATION)), physics::vec3_type(0, 0, 1)).rotate(physics::vec3_type(0, offset, -length / 2 + radius)))),
-		std::make_pair(sphereGeometry, physics::transform_type(physics::quaternion_type(physics::real_type(toRadians(DNA::PITCH * bases)), physics::vec3_type(0, 0, 1)).rotate(physics::vec3_type(0, offset, length / 2 - radius)))),
-		std::make_pair(sphereGeometry, physics::transform_type(physics::quaternion_type(physics::real_type(toRadians(DNA::PITCH * bases - DNA::OPPOSITE_ROTATION)), physics::vec3_type(0, 0, 1)).rotate(physics::vec3_type(0, offset, length / 2 - radius)))));
+	if (length > DNA::RADIUS_PLUS_SPHERE_RADIUS * 2) {
+		rigidBody = phys.create_rigid_body(transform, settings.density,
+			std::make_pair(physics::capsule_geometry_type(physics::real_type(DNA::RADIUS_PLUS_SPHERE_RADIUS), length / 2 - physics::real_type(DNA::RADIUS_PLUS_SPHERE_RADIUS)), physics::transform_type(physics::quaternion_type(physics::real_type(M_PI_2), kNegYAxis))),
+			std::make_pair(sphereGeometry, physics::transform_type(physics::vec3_type(0, offset, -length / 2 + radius))),
+			std::make_pair(sphereGeometry, physics::transform_type(physics::quaternion_type(physics::real_type(toRadians(-DNA::OPPOSITE_ROTATION)), physics::vec3_type(0, 0, 1)).rotate(physics::vec3_type(0, offset, -length / 2 + radius)))),
+			std::make_pair(sphereGeometry, physics::transform_type(physics::quaternion_type(physics::real_type(toRadians(DNA::PITCH * bases)), physics::vec3_type(0, 0, 1)).rotate(physics::vec3_type(0, offset, length / 2 - radius)))),
+			std::make_pair(sphereGeometry, physics::transform_type(physics::quaternion_type(physics::real_type(toRadians(DNA::PITCH * bases - DNA::OPPOSITE_ROTATION)), physics::vec3_type(0, 0, 1)).rotate(physics::vec3_type(0, offset, length / 2 - radius)))));
+	} else {
+		rigidBody = phys.create_rigid_body(transform, settings.density,
+			std::make_pair(sphereGeometry, physics::transform_type(physics::vec3_type(0, offset, -length / 2 + radius))),
+			std::make_pair(sphereGeometry, physics::transform_type(physics::quaternion_type(physics::real_type(toRadians(-DNA::OPPOSITE_ROTATION)), physics::vec3_type(0, 0, 1)).rotate(physics::vec3_type(0, offset, -length / 2 + radius)))),
+			std::make_pair(sphereGeometry, physics::transform_type(physics::quaternion_type(physics::real_type(toRadians(DNA::PITCH * bases)), physics::vec3_type(0, 0, 1)).rotate(physics::vec3_type(0, offset, length / 2 - radius)))),
+			std::make_pair(sphereGeometry, physics::transform_type(physics::quaternion_type(physics::real_type(toRadians(DNA::PITCH * bases - DNA::OPPOSITE_ROTATION)), physics::vec3_type(0, 0, 1)).rotate(physics::vec3_type(0, offset, length / 2 - radius)))));
+	}
 	assert(rigidBody != nullptr);
 
 	if (settings.attach_fixed) {

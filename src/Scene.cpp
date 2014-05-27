@@ -28,6 +28,7 @@ bool scene::read_rmesh(physics & phys, std::istream & ifile) {
 			assert(edge >= 1);
 			path.push_back(edge - 1);
 		} else if (sscanf(line.c_str(), "v %f %f %f", &vertex.x, &vertex.y, &vertex.z) == 3) {
+			vertex *= settings.initial_scaling;
 			vertices.push_back(vertex);
 		} else if (sscanf(line.c_str(), "h %u %f %f %f %f %f %f", &numBases, &vertex.x, &vertex.y, &vertex.z, &zDirection.x, &zDirection.y, &zDirection.z) == 7) {
 			const physics::vec3_type cross(kPosZAxis.cross(zDirection));
@@ -72,11 +73,13 @@ bool scene::read_ply(physics & phys, std::istream & ply_file, std::istream & ntr
 			for (unsigned int i = 0; i < pre_vertices_rows; ++i)
 				std::getline(ply_file, line);
 		} else if (sscanf(line.c_str(), "%f %f %f", &vertex.x, &vertex.y, &vertex.z) == 3 && vertices.size() < num_vertices) {
+			vertex *= settings.initial_scaling;
 			vertices.push_back(vertex);
 		}
 	}
 
 	std::copy(std::istream_iterator<unsigned int>(ntrail_file), std::istream_iterator<unsigned int>(), std::back_inserter(path));
+	path.pop_back(); // Because .ntrail stores the last and the first as the same index, this is implied in the rectification algorithm.
 
 	return setupHelices(phys);
 }
@@ -111,7 +114,7 @@ bool scene::setupHelices(physics & phys) {
 
 		vertex.normal.normalize();
 
-		std::cerr << "vertex " << vertexIndex << " normal: " << vertex.normal.x << ' ' << vertex.normal.y << ' ' << vertex.normal.z << std::endl;
+		//std::cerr << "vertex " << vertexIndex << " position: " << vertex.position.x << ' ' << vertex.position.y << ' ' << vertex.position.z << std::endl;
 
 		physics::vec3_type tangent((vertices[edges[vertex.neighbor_edges.front().index].other(vertexIndex)].position - vertex.position).getNormalized());
 		tangent -= proj(tangent, vertex.normal);
@@ -214,7 +217,7 @@ bool scene::setupHelices(physics & phys) {
 		helices.emplace_back(
 			helix_settings,
 			phys, DNA::DistanceToBaseCount(length),
-			physics::transform_type((origo + tangent * physics::real_type((duplicates[edge] - 1) * (DNA::RADIUS + DNA::SPHERE_RADIUS))) * settings.initial_scaling, rotationFromTo(kPosZAxis, direction)));
+			physics::transform_type((origo + tangent * physics::real_type((duplicates[edge] - 1) * (DNA::RADIUS + DNA::SPHERE_RADIUS))), rotationFromTo(kPosZAxis, direction)));
 	}
 
 	// Connect the scaffold.
@@ -327,7 +330,7 @@ bool SceneDescription::write(std::ostream & out) const {
 
 			const physics::vec3_type & position(helix.getPosition());
 			const physics::quaternion_type & orientation(helix.getOrientation());
-			out << "hb " << name << ' ' << helix.baseCount << ' ' << position.x << ' ' << position.y << ' ' << position.z << ' ' << orientation.x << ' ' << orientation.y << ' ' << orientation.z << orientation.w << std::endl;
+			out << "hb " << name << ' ' << helix.baseCount << ' ' << position.x << ' ' << position.y << ' ' << position.z << ' ' << orientation.x << ' ' << orientation.y << ' ' << orientation.z << ' ' << orientation.w << std::endl;
 		}
 	}
 
